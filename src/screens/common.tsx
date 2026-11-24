@@ -19,7 +19,7 @@ export function SyncBadge() {
   else if (s.state === 'error' || s.state === 'signedout') { cls = 'err'; text = pending ? `Sync error · ${pending} waiting` : 'Sync error' }
   else if (pending) { cls = 'warn'; text = `${pending} waiting` }
   return (
-    <button className={`badge ${cls}`} onClick={() => { void sync(); if (s.error) alert(s.error) }}>
+    <button className={`badge ${cls}`} onClick={() => { void sync(); go('backup') }}>
       <span className="dot" />{text}
     </button>
   )
@@ -35,14 +35,8 @@ export function Header({ title, backBtn, right }: { title: string; backBtn?: boo
   )
 }
 
-export function TabBar({ active }: { active: 'home' | 'reports' }) {
-  return (
-    <nav className="tabs">
-      <button className={active === 'home' ? 'on' : ''} onClick={() => go('')}>🏠<span>Jobs</span></button>
-      <button className="add" onClick={() => go('new')}>＋</button>
-      <button className={active === 'reports' ? 'on' : ''} onClick={() => go('reports')}>📊<span>Totals</span></button>
-    </nav>
-  )
+export function AddButton() {
+  return <button className="fab" aria-label="New job" onClick={() => go('new')}>＋</button>
 }
 
 export function Thumb({ id, path, onClick, label }: { id: string; path: string; onClick?: () => void; label?: string }) {
@@ -66,9 +60,4 @@ export function useAllData() {
   const properties = useLiveQuery(() => db.properties.filter((p) => !p.deleted).toArray(), [], [] as Property[])
   const jobs = useLiveQuery(() => db.jobs.filter((j) => !j.deleted).toArray(), [], [] as Job[])
   return { properties, jobs }
-}
-
-export function csvEscape(v: unknown) {
-  const s = v == null ? '' : String(v)
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }

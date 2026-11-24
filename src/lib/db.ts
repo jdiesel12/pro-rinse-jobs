@@ -20,7 +20,6 @@ export type Job = SyncFields & {
   price: number | null
   services: string[]
   duration_min: number | null
-  paid: boolean
   notes: string
 }
 
@@ -94,7 +93,7 @@ export async function createJob(property_id: string): Promise<string> {
     .sort((a, b) => b.job_date.localeCompare(a.job_date))[0]
   await db.jobs.add({
     id, property_id, job_date: today(), price: null,
-    services: prev ? [...prev.services] : [], duration_min: null, paid: false, notes: '',
+    services: prev ? [...prev.services] : [], duration_min: null, notes: '',
     created_at: t, deleted: false, dirty: 1, mtime: t,
   })
   return id

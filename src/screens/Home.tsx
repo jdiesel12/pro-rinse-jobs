@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { fmtDate, money, type Job } from '../lib/db'
 import { go } from '../lib/nav'
-import { Header, TabBar, useAllData } from './common'
+import { AddButton, Header, useAllData } from './common'
 
 export function Home() {
   const { properties, jobs } = useAllData()
@@ -49,7 +49,7 @@ export function Home() {
                     <div className="title">{propName.get(j.property_id) ?? '—'}</div>
                     <div className="sub">{fmtDate(j.job_date)}{j.services.length ? ' · ' + j.services.join(', ') : ''}</div>
                   </div>
-                  <div className={`price ${j.paid ? '' : 'unpaid'}`}>{money(j.price)}</div>
+                  <div className="price">{money(j.price)}</div>
                 </button>
               ))}
             </div>
@@ -79,7 +79,7 @@ export function Home() {
           </div>
         )}
       </div>
-      <TabBar active="home" />
+      <AddButton />
     </div>
   )
 }

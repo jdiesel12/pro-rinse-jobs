@@ -26,10 +26,6 @@ export function PropertyScreen({ id }: { id: string }) {
 
   const set = (changes: Partial<Property>) => { setProp({ ...prop, ...changes }); void patchProperty(id, changes) }
 
-  const priced = jobs.filter((j) => j.price != null)
-  const total = priced.reduce((s, j) => s + (j.price ?? 0), 0)
-  const avg = priced.length ? total / priced.length : null
-
   return (
     <div className="screen">
       <Header title="Property" backBtn />
@@ -42,13 +38,6 @@ export function PropertyScreen({ id }: { id: string }) {
           <label>Client / contractor<input defaultValue={prop.client} placeholder="Homeowner name or contractor" onChange={(e) => set({ client: e.target.value })} /></label>
           <label>Access (gate codes, lockbox, dogs)<textarea rows={2} defaultValue={prop.access_notes} onChange={(e) => set({ access_notes: e.target.value })} /></label>
           <label>Property notes (window count, ladders, problem spots)<textarea rows={4} defaultValue={prop.notes} onChange={(e) => set({ notes: e.target.value })} /></label>
-        </div>
-
-        <div className="stats">
-          <div><b>{jobs.length}</b><span>jobs</span></div>
-          <div><b>{money(jobs[0]?.price)}</b><span>last price</span></div>
-          <div><b>{money(avg == null ? null : Math.round(avg))}</b><span>average</span></div>
-          <div><b>{money(total)}</b><span>lifetime</span></div>
         </div>
 
         <button className="btn primary big" onClick={async () => { const jid = await createJob(id); go('j/' + jid + '/new') }}>＋ New job here</button>
@@ -64,7 +53,7 @@ export function PropertyScreen({ id }: { id: string }) {
                   <div className="title">{fmtDate(j.job_date)}</div>
                   <div className="sub">{j.services.join(', ') || 'No services tagged'}{j.duration_min ? ` · ${+(j.duration_min / 60).toFixed(1)}h` : ''}</div>
                 </div>
-                <div className={`price ${j.paid ? '' : 'unpaid'}`}>{money(j.price)}{!j.paid && j.price != null && <small>unpaid</small>}</div>
+                <div className="price">{money(j.price)}</div>
               </div>
               {j.notes && <div className="sub clamp">{j.notes}</div>}
               {ps.length > 0 && (

@@ -6,7 +6,7 @@ import { Home } from './screens/Home'
 import { NewJob } from './screens/NewJob'
 import { JobScreen } from './screens/JobScreen'
 import { PropertyScreen } from './screens/PropertyScreen'
-import { Reports } from './screens/Reports'
+import { Backup } from './screens/Backup'
 
 // Tiny hash router so iOS swipe-back works in the installed app.
 function useRoute() {
@@ -45,7 +45,7 @@ export default function App() {
     case 'new': return <NewJob />
     case 'j': return <JobScreen key={a} id={a} owner={owner} />
     case 'p': return <PropertyScreen key={a} id={a} />
-    case 'reports': return <Reports />
+    case 'backup': return <Backup />
     default: return <Home />
   }
 }

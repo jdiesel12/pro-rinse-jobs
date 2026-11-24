@@ -102,10 +102,6 @@ export function JobScreen({ id, owner }: { id: string; owner: string }) {
           </label>
           <label>Hours on site<input type="text" inputMode="decimal" placeholder="optional" defaultValue={hours}
             onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); set({ duration_min: v === '' ? null : Math.round(Number(v) * 60) }) }} /></label>
-          <label className="toggle">
-            <span>Paid</span>
-            <input type="checkbox" checked={job.paid} onChange={(e) => set({ paid: e.target.checked })} />
-          </label>
         </div>
 
         <div className="card">

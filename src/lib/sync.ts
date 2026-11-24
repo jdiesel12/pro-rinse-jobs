@@ -71,8 +71,9 @@ export function startAutoSync() {
 type Row = { id: string; dirty: 0 | 1; mtime: string; updated_at?: string; [k: string]: unknown }
 
 function toServer(r: Row) {
-  const { dirty: _d, mtime: _m, updated_at: _u, ...rest } = r
-  void _d; void _m; void _u
+  // `paid` was removed from the schema; strip it from any rows saved by the old version.
+  const { dirty: _d, mtime: _m, updated_at: _u, paid: _p, ...rest } = r
+  void _d; void _m; void _u; void _p
   return rest
 }
 
