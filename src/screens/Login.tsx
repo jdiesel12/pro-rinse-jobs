@@ -16,27 +16,30 @@ export function Login() {
       ? await supabase.auth.signInWithPassword({ email, password })
       : await supabase.auth.signUp({ email, password })
     setBusy(false)
-    if (error) { setMsg(error.message.includes('Database error') ? 'Sign-ups are closed — this app already has its owner.' : error.message); return }
+    if (error) { setMsg(error.message); return }
     if (mode === 'up' && !data.session) {
-      setMsg('Account created. Check your email for the confirmation link, tap it, then come back and sign in.')
+      setMsg('Account created. Tap the confirmation link in your email, then sign in here.')
       setMode('in')
     }
   }
 
   return (
-    <div className="screen login">
-      <img src={`${import.meta.env.BASE_URL}pwa-192.png`} alt="" className="login-logo" />
-      <h1>Pro Rinse Jobs</h1>
-      <p className="muted">{mode === 'in' ? 'Sign in' : 'Create your account (one-time)'}</p>
-      <form onSubmit={submit} className="stack">
-        <input type="email" autoComplete="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <input type="password" autoComplete={mode === 'in' ? 'current-password' : 'new-password'} placeholder="Password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required />
-        <button className="btn primary big" disabled={busy}>{busy ? '…' : mode === 'in' ? 'Sign in' : 'Create account'}</button>
-      </form>
-      {msg && <p className="note">{msg}</p>}
-      <button className="link" onClick={() => { setMode(mode === 'in' ? 'up' : 'in'); setMsg('') }}>
-        {mode === 'in' ? 'First time? Create account' : 'Have an account? Sign in'}
-      </button>
+    <div className="login">
+      <div className="login-glow" />
+      <div className="login-inner">
+        <img src={`${import.meta.env.BASE_URL}pwa-192.png`} alt="" className="login-logo" />
+        <h1>Pro Rinse</h1>
+        <p className="login-tag">Every job, every pane, every price.</p>
+        <form onSubmit={submit} className="login-card">
+          <input type="email" autoComplete="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input type="password" autoComplete={mode === 'in' ? 'current-password' : 'new-password'} placeholder="Password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <button className="btn primary big" disabled={busy}>{busy ? 'One sec…' : mode === 'in' ? 'Sign in' : 'Create account'}</button>
+          {msg && <p className="login-msg">{msg}</p>}
+        </form>
+        <button className="login-switch" onClick={() => { setMode(mode === 'in' ? 'up' : 'in'); setMsg('') }}>
+          {mode === 'in' ? 'First time here? Create your account' : 'Already set up? Sign in'}
+        </button>
+      </div>
     </div>
   )
 }

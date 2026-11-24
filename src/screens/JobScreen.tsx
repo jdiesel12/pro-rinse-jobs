@@ -7,6 +7,10 @@ import {
 import { compressImage } from '../lib/image'
 import { back, go } from '../lib/nav'
 import { Header, Thumb } from './common'
+import { ICalendar, ICamera, ICheck, IChevron, IClock, IHistory, IImage, IKey, INote, IPin, ITag, ITrash, IX } from './icons'
+
+const KINDS: PhotoKind[] = ['before', 'after', 'other']
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1)
 
 export function JobScreen({ id, owner }: { id: string; owner: string }) {
   const [job, setJob] = useState<Job | null | undefined>(undefined)
@@ -47,8 +51,7 @@ export function JobScreen({ id, owner }: { id: string; owner: string }) {
     setBusy((b) => b + files.length)
     for (const f of Array.from(files)) {
       try {
-        const blob = await compressImage(f)
-        await addPhoto(id, kind, blob, owner)
+        await addPhoto(id, kind, await compressImage(f), owner)
       } catch (e) {
         alert('Could not read that photo: ' + (e instanceof Error ? e.message : e))
       } finally {
@@ -71,58 +74,76 @@ export function JobScreen({ id, owner }: { id: string; owner: string }) {
   }
 
   const hours = job.duration_min == null ? '' : String(+(job.duration_min / 60).toFixed(2))
+  const counts = Object.fromEntries(KINDS.map((k) => [k, photos.filter((p) => p.kind === k).length]))
 
   return (
     <div className="screen">
-      <Header title={isNew ? 'New job' : 'Job'} right={<button className="btn primary sm" onClick={done}>Done</button>} />
+      <Header title={isNew ? 'New job' : fmtDate(job.job_date)} backBtn right={<button className="btn primary pill-btn" onClick={done}>Done</button>} />
       <div className="pad stack">
-        <button className="card prop-link" onClick={() => go('p/' + job.property_id)}>
+        <button className="card prop-card" onClick={() => go('p/' + job.property_id)}>
+          <span className="tile blue"><IPin size={20} /></span>
           <div className="grow">
-            <div className="title">{property?.address || '(no address)'}</div>
-            {property?.access_notes && <div className="sub access">🔑 {property.access_notes}</div>}
-            {prevJob && <div className="sub">Last time: {fmtDate(prevJob.job_date)} · {money(prevJob.price)}</div>}
+            <div className="title">{property?.address || 'No address'}</div>
+            {prevJob
+              ? <div className="sub"><IHistory size={13} className="inline-ic" /> Last visit {fmtDate(prevJob.job_date)} · {money(prevJob.price)}</div>
+              : <div className="sub">First visit</div>}
           </div>
-          <span className="chev">›</span>
+          <IChevron size={18} className="chev" />
         </button>
 
-        <div className="card form">
-          <label>Date<input type="date" value={job.job_date} onChange={(e) => e.target.value && set({ job_date: e.target.value })} /></label>
-          <label>Price billed
-            <div className="money-input">
-              <span>$</span>
-              <input
-                type="text" inputMode="decimal" placeholder="0"
-                defaultValue={job.price ?? ''}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/[^0-9.]/g, '')
-                  set({ price: v === '' ? null : Number(v) })
-                }}
-              />
-            </div>
-          </label>
-          <label>Hours on site<input type="text" inputMode="decimal" placeholder="optional" defaultValue={hours}
-            onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); set({ duration_min: v === '' ? null : Math.round(Number(v) * 60) }) }} /></label>
+        {property?.access_notes && (
+          <div className="callout amber"><IKey size={16} /><span>{property.access_notes}</span></div>
+        )}
+
+        <div className="card price-card">
+          <div className="label">Price</div>
+          <div className="price-input">
+            <span>$</span>
+            <input type="text" inputMode="decimal" placeholder="0" defaultValue={job.price ?? ''}
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); set({ price: v === '' ? null : Number(v) }) }} />
+          </div>
+          <div className="split">
+            <label className="mini-field">
+              <span className="label"><ICalendar size={13} /> Date</span>
+              <input type="date" value={job.job_date} onChange={(e) => e.target.value && set({ job_date: e.target.value })} />
+            </label>
+            <label className="mini-field">
+              <span className="label"><IClock size={13} /> Hours</span>
+              <input type="text" inputMode="decimal" placeholder="—" defaultValue={hours}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); set({ duration_min: v === '' ? null : Math.round(Number(v) * 60) }) }} />
+            </label>
+          </div>
         </div>
 
         <div className="card">
-          <div className="card-title">Services</div>
+          <div className="card-title"><ITag size={16} /> Services</div>
           <div className="chips">
-            {SERVICES.map((s) => (
-              <button key={s} className={`chip ${job.services.includes(s) ? 'on' : ''}`} onClick={() => toggleService(s)}>{s}</button>
-            ))}
+            {SERVICES.map((s) => {
+              const on = job.services.includes(s)
+              return (
+                <button key={s} className={`chip ${on ? 'on' : ''}`} onClick={() => toggleService(s)}>
+                  {on && <ICheck size={14} strokeWidth={3} />}{s}
+                </button>
+              )
+            })}
           </div>
         </div>
 
         <div className="card">
-          <div className="card-title">Photos {busy > 0 && <span className="muted">· saving {busy}…</span>}</div>
+          <div className="card-title">
+            <ICamera size={16} /> Photos
+            {busy > 0 && <span className="saving">Saving {busy}…</span>}
+          </div>
           <div className="seg">
-            {(['before', 'after', 'other'] as PhotoKind[]).map((k) => (
-              <button key={k} className={kind === k ? 'on' : ''} onClick={() => setKind(k)}>{k[0].toUpperCase() + k.slice(1)}</button>
+            {KINDS.map((k) => (
+              <button key={k} className={kind === k ? 'on' : ''} onClick={() => setKind(k)}>
+                {cap(k)}{counts[k] > 0 && <small>{counts[k]}</small>}
+              </button>
             ))}
           </div>
-          <div className="row-btns">
-            <button className="btn big" onClick={() => camRef.current?.click()}>📷 Camera</button>
-            <button className="btn big" onClick={() => libRef.current?.click()}>🖼️ Library</button>
+          <div className="photo-actions">
+            <button className="action" onClick={() => camRef.current?.click()}><ICamera size={22} /><span>Take {kind} photo</span></button>
+            <button className="action" onClick={() => libRef.current?.click()}><IImage size={22} /><span>From library</span></button>
           </div>
           <input ref={camRef} hidden type="file" accept="image/*" capture="environment" onChange={(e) => { void onFiles(e.target.files); e.target.value = '' }} />
           <input ref={libRef} hidden type="file" accept="image/*" multiple onChange={(e) => { void onFiles(e.target.files); e.target.value = '' }} />
@@ -133,29 +154,33 @@ export function JobScreen({ id, owner }: { id: string; owner: string }) {
           )}
         </div>
 
-        <div className="card form">
-          <label>Notes
-            <textarea rows={4} placeholder="Anything worth remembering: problem windows, extras, upsell ideas…" defaultValue={job.notes}
-              onChange={(e) => set({ notes: e.target.value })} />
-          </label>
+        <div className="card">
+          <div className="card-title"><INote size={16} /> Notes</div>
+          <textarea className="soft" rows={4} placeholder="Problem windows, extras, anything worth remembering…" defaultValue={job.notes}
+            onChange={(e) => set({ notes: e.target.value })} />
         </div>
 
-        <button className="btn danger" onClick={async () => { if (confirm('Delete this job and its photos?')) { await deleteJob(id); back() } }}>Delete job</button>
+        <button className="text-danger" onClick={async () => { if (confirm('Delete this job and its photos?')) { await deleteJob(id); back() } }}>
+          <ITrash size={16} /> Delete job
+        </button>
       </div>
 
       {viewer && (
-        <div className="viewer" onClick={() => setViewer(null)}>
+        <div className="viewer">
+          <button className="viewer-close" aria-label="Close" onClick={() => setViewer(null)}><IX size={22} /></button>
           <FullImage id={viewer.id} />
-          <div className="viewer-bar" onClick={(e) => e.stopPropagation()}>
-            <select value={viewer.kind} onChange={async (e) => {
-              const k = e.target.value as PhotoKind
-              await db.photos.update(viewer.id, { kind: k, dirty: 1, mtime: new Date().toISOString() })
-              setViewer({ ...viewer, kind: k })
-            }}>
-              <option value="before">Before</option><option value="after">After</option><option value="other">Other</option>
-            </select>
-            <button className="btn danger sm" onClick={async () => { if (confirm('Delete photo?')) { await deletePhoto(viewer.id); setViewer(null) } }}>Delete</button>
-            <button className="btn sm" onClick={() => setViewer(null)}>Close</button>
+          <div className="viewer-bar">
+            <div className="seg dark">
+              {KINDS.map((k) => (
+                <button key={k} className={viewer.kind === k ? 'on' : ''} onClick={async () => {
+                  await db.photos.update(viewer.id, { kind: k, dirty: 1, mtime: new Date().toISOString() })
+                  setViewer({ ...viewer, kind: k })
+                }}>{cap(k)}</button>
+              ))}
+            </div>
+            <button className="icon-btn danger" aria-label="Delete photo" onClick={async () => { if (confirm('Delete photo?')) { await deletePhoto(viewer.id); setViewer(null) } }}>
+              <ITrash size={20} />
+            </button>
           </div>
         </div>
       )}

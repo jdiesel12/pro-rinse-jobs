@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { createJob, db, deleteProperty, fmtDate, money, patchProperty, type Job, type Photo, type Property } from '../lib/db'
 import { back, go } from '../lib/nav'
 import { Header, Thumb } from './common'
+import { IKey, INav, INote, IPlus, ITrash, IUser } from './icons'
 
 export function PropertyScreen({ id }: { id: string }) {
   const [prop, setProp] = useState<Property | null | undefined>(undefined)
@@ -15,60 +16,88 @@ export function PropertyScreen({ id }: { id: string }) {
   )
   const photosByJob = useLiveQuery(async () => {
     const ids = jobs.map((j) => j.id)
-    const ps = ids.length ? await db.photos.where('job_id').anyOf(ids).filter((p) => !p.deleted).toArray() : []
+    const ps = ids.length ? await db.photos.where('job_id').anyOf(ids).filter((p) => !p.deleted).sortBy('created_at') : []
     const m = new Map<string, Photo[]>()
     for (const p of ps) m.set(p.job_id, [...(m.get(p.job_id) ?? []), p])
     return m
   }, [jobs], new Map<string, Photo[]>())
 
-  if (prop === undefined) return <div className="screen"><Header title="Property" backBtn /></div>
-  if (prop === null || prop.deleted) return <div className="screen"><Header title="Property" backBtn /><div className="empty">Property not found.</div></div>
+  if (prop === undefined) return <div className="screen"><Header title="" backBtn /></div>
+  if (prop === null || prop.deleted) return <div className="screen"><Header title="" backBtn /><div className="empty">Property not found.</div></div>
 
   const set = (changes: Partial<Property>) => { setProp({ ...prop, ...changes }); void patchProperty(id, changes) }
 
   return (
     <div className="screen">
-      <Header title="Property" backBtn />
+      <Header title="" backBtn />
       <div className="pad stack">
-        <div className="card form">
-          <label>Address<input defaultValue={prop.address} placeholder="123 Main St, Lehi" onChange={(e) => set({ address: e.target.value })} /></label>
-          {prop.address && (
-            <a className="maplink" href={`https://maps.apple.com/?q=${encodeURIComponent(prop.address)}`} target="_blank" rel="noreferrer">📍 Open in Maps</a>
-          )}
-          <label>Client / contractor<input defaultValue={prop.client} placeholder="Homeowner name or contractor" onChange={(e) => set({ client: e.target.value })} /></label>
-          <label>Access (gate codes, lockbox, dogs)<textarea rows={2} defaultValue={prop.access_notes} onChange={(e) => set({ access_notes: e.target.value })} /></label>
-          <label>Property notes (window count, ladders, problem spots)<textarea rows={4} defaultValue={prop.notes} onChange={(e) => set({ notes: e.target.value })} /></label>
+        <div className="prop-hero">
+          <textarea className="addr-input" rows={1} defaultValue={prop.address} placeholder="Address"
+            onChange={(e) => set({ address: e.target.value })}
+            onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px' }} />
+          <label className="client-input">
+            <IUser size={15} />
+            <input defaultValue={prop.client} placeholder="Client or contractor" onChange={(e) => set({ client: e.target.value })} />
+          </label>
+          <div className="hero-actions">
+            <button className="btn primary" onClick={async () => { const jid = await createJob(id); go('j/' + jid + '/new') }}>
+              <IPlus size={18} strokeWidth={2.6} /> New job
+            </button>
+            {prop.address && (
+              <a className="btn" href={`https://maps.apple.com/?q=${encodeURIComponent(prop.address)}`} target="_blank" rel="noreferrer">
+                <INav size={16} /> Directions
+              </a>
+            )}
+          </div>
         </div>
 
-        <button className="btn primary big" onClick={async () => { const jid = await createJob(id); go('j/' + jid + '/new') }}>＋ New job here</button>
+        <div className="card tinted-amber">
+          <div className="card-title amber-text"><IKey size={16} /> Access</div>
+          <textarea className="soft" rows={2} placeholder="Gate code, lockbox, dogs, where to park…" defaultValue={prop.access_notes}
+            onChange={(e) => set({ access_notes: e.target.value })} />
+        </div>
 
-        <h2 className="section">Job history</h2>
-        {jobs.length === 0 && <div className="empty">No jobs yet.</div>}
-        {jobs.map((j) => {
-          const ps = photosByJob.get(j.id) ?? []
-          return (
-            <button key={j.id} className="card job-card" onClick={() => go('j/' + j.id)}>
-              <div className="job-top">
-                <div>
-                  <div className="title">{fmtDate(j.job_date)}</div>
-                  <div className="sub">{j.services.join(', ') || 'No services tagged'}{j.duration_min ? ` · ${+(j.duration_min / 60).toFixed(1)}h` : ''}</div>
-                </div>
-                <div className="price">{money(j.price)}</div>
-              </div>
-              {j.notes && <div className="sub clamp">{j.notes}</div>}
-              {ps.length > 0 && (
-                <div className="strip">
-                  {ps.slice(0, 5).map((p) => <Thumb key={p.id} id={p.id} path={p.path} />)}
-                  {ps.length > 5 && <span className="more">+{ps.length - 5}</span>}
-                </div>
-              )}
-            </button>
-          )
-        })}
+        <div className="card">
+          <div className="card-title"><INote size={16} /> Property notes</div>
+          <textarea className="soft" rows={3} placeholder="Window count, ladder spots, problem areas…" defaultValue={prop.notes}
+            onChange={(e) => set({ notes: e.target.value })} />
+        </div>
 
-        <button className="btn danger" onClick={async () => {
+        <h2 className="section">History {jobs.length > 0 && <span className="count">{jobs.length}</span>}</h2>
+        {jobs.length === 0 && <div className="empty">No jobs here yet.</div>}
+        <div className="timeline">
+          {jobs.map((j) => {
+            const ps = photosByJob.get(j.id) ?? []
+            return (
+              <button key={j.id} className="tl-item" onClick={() => go('j/' + j.id)}>
+                <span className="tl-dot" />
+                <div className="card tl-card">
+                  <div className="tl-top">
+                    <div className="title">{fmtDate(j.job_date)}</div>
+                    <div className="tl-price">{money(j.price)}</div>
+                  </div>
+                  {(j.services.length > 0 || j.duration_min) && (
+                    <div className="mini-tags">
+                      {j.services.map((s) => <span key={s}>{s}</span>)}
+                      {j.duration_min ? <span className="ghost">{+(j.duration_min / 60).toFixed(1)} hrs</span> : null}
+                    </div>
+                  )}
+                  {j.notes && <div className="sub clamp">{j.notes}</div>}
+                  {ps.length > 0 && (
+                    <div className="strip">
+                      {ps.slice(0, 4).map((p) => <Thumb key={p.id} id={p.id} path={p.path} />)}
+                      {ps.length > 4 && <span className="more">+{ps.length - 4}</span>}
+                    </div>
+                  )}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        <button className="text-danger" onClick={async () => {
           if (confirm(`Delete this property and all ${jobs.length} job(s)?`)) { await deleteProperty(id); back() }
-        }}>Delete property</button>
+        }}><ITrash size={16} /> Delete property</button>
       </div>
     </div>
   )

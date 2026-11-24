@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { fmtDate, money, type Job } from '../lib/db'
+import { money, type Job } from '../lib/db'
 import { go } from '../lib/nav'
-import { AddButton, Header, useAllData } from './common'
+import { AddButton, Cover, relDate, SyncBadge, useAllData, useCoverPhotos } from './common'
+import { IChevron, IDroplet, ISearch, IX } from './icons'
 
 export function Home() {
   const { properties, jobs } = useAllData()
@@ -9,16 +10,12 @@ export function Home() {
 
   const byProp = useMemo(() => {
     const m = new Map<string, Job[]>()
-    for (const j of jobs) {
-      const arr = m.get(j.property_id) ?? []
-      arr.push(j)
-      m.set(j.property_id, arr)
-    }
+    for (const j of jobs) m.set(j.property_id, [...(m.get(j.property_id) ?? []), j])
     for (const arr of m.values()) arr.sort((a, b) => b.job_date.localeCompare(a.job_date))
     return m
   }, [jobs])
 
-  const propName = useMemo(() => new Map(properties.map((p) => [p.id, p.address || '(no address)'])), [properties])
+  const propName = useMemo(() => new Map(properties.map((p) => [p.id, p.address || 'No address'])), [properties])
 
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -29,51 +26,81 @@ export function Home() {
   }, [properties, byProp, q])
 
   const recent = useMemo(
-    () => [...jobs].sort((a, b) => b.job_date.localeCompare(a.job_date) || b.created_at.localeCompare(a.created_at)).slice(0, 8),
+    () => [...jobs].sort((a, b) => b.job_date.localeCompare(a.job_date) || b.created_at.localeCompare(a.created_at)).slice(0, 10),
     [jobs],
   )
+  const covers = useCoverPhotos(useMemo(
+    () => [...new Set([...recent.map((j) => j.id), ...list.map((x) => x.js[0]?.id).filter(Boolean) as string[]])],
+    [recent, list],
+  ))
+
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
   return (
-    <div className="screen with-tabs">
-      <Header title="Pro Rinse Jobs" />
-      <div className="pad">
-        <input className="search" type="search" placeholder="Search address, client, notes…" value={q} onChange={(e) => setQ(e.target.value)} />
+    <div className="screen with-fab">
+      <section className="hero">
+        <div className="hero-top">
+          <span className="brand"><IDroplet size={16} strokeWidth={2.4} /> PRO RINSE</span>
+          <SyncBadge glass />
+        </div>
+        <h1 className="hero-title">Jobs</h1>
+        <p className="hero-sub">{today}</p>
+        <label className="searchbar">
+          <ISearch size={18} />
+          <input type="search" placeholder="Search address, client, notes" value={q} onChange={(e) => setQ(e.target.value)} />
+          {q && <button aria-label="Clear" onClick={() => setQ('')}><IX size={16} /></button>}
+        </label>
+      </section>
 
-        {!q && recent.length > 0 && (
-          <>
-            <h2 className="section">Recent jobs</h2>
-            <div className="card list">
-              {recent.map((j) => (
-                <button key={j.id} className="row" onClick={() => go('j/' + j.id)}>
-                  <div className="grow">
-                    <div className="title">{propName.get(j.property_id) ?? '—'}</div>
-                    <div className="sub">{fmtDate(j.job_date)}{j.services.length ? ' · ' + j.services.join(', ') : ''}</div>
+      {!q && recent.length > 0 && (
+        <>
+          <h2 className="section pad-x">Recent</h2>
+          <div className="carousel">
+            {recent.map((j) => (
+              <button key={j.id} className="rcard" onClick={() => go('j/' + j.id)}>
+                <Cover photo={covers.get(j.id)} className="rcard-img" />
+                <div className="rcard-body">
+                  <div className="rcard-addr">{propName.get(j.property_id) ?? '—'}</div>
+                  <div className="rcard-meta">
+                    <span>{relDate(j.job_date)}</span>
+                    {j.price != null && <span className="pill">{money(j.price)}</span>}
                   </div>
-                  <div className="price">{money(j.price)}</div>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
-        <h2 className="section">Properties {list.length ? <span className="muted">({list.length})</span> : null}</h2>
-        {list.length === 0 && (
-          <div className="empty">
-            {q ? 'No matches.' : 'No properties yet. Tap ＋ to log your first job.'}
+      <div className="pad">
+        <h2 className="section">
+          {q ? 'Results' : 'Properties'} {list.length > 0 && <span className="count">{list.length}</span>}
+        </h2>
+
+        {list.length === 0 && !q && (
+          <div className="empty-state">
+            <div className="empty-icon"><IDroplet size={34} /></div>
+            <h3>No jobs yet</h3>
+            <p>Log your first job: address, price, and a few before & after shots.</p>
+            <button className="btn primary" onClick={() => go('new')}>Log a job</button>
           </div>
         )}
+        {list.length === 0 && q && <div className="empty">Nothing matches “{q}”.</div>}
+
         {list.length > 0 && (
           <div className="card list">
             {list.map(({ p, js }) => (
               <button key={p.id} className="row" onClick={() => go('p/' + p.id)}>
+                <Cover photo={js[0] ? covers.get(js[0].id) : undefined} className="row-cover" />
                 <div className="grow">
-                  <div className="title">{p.address || '(no address)'}</div>
+                  <div className="title">{p.address || 'No address'}</div>
                   <div className="sub">
-                    {p.client && <>{p.client} · </>}
-                    {js.length ? <>Last {fmtDate(js[0].job_date)} · {js.length} job{js.length > 1 ? 's' : ''}</> : 'No jobs yet'}
+                    {js.length ? `${relDate(js[0].job_date)} · ${js.length} job${js.length > 1 ? 's' : ''}` : 'No jobs yet'}
+                    {p.client && ` · ${p.client}`}
                   </div>
                 </div>
-                <div className="price">{js[0] ? money(js[0].price) : ''}</div>
+                {js[0]?.price != null && <span className="row-price">{money(js[0].price)}</span>}
+                <IChevron size={18} className="chev" />
               </button>
             ))}
           </div>
