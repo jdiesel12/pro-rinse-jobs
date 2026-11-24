@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { money, type Job } from '../lib/db'
+import { money, propSubtitle, propTitle, type Job } from '../lib/db'
 import { go } from '../lib/nav'
 import { AddButton, Cover, relDate, SyncBadge, useAllData, useCoverPhotos } from './common'
 import { IChevron, IDroplet, ISearch, IX } from './icons'
@@ -15,12 +15,12 @@ export function Home() {
     return m
   }, [jobs])
 
-  const propName = useMemo(() => new Map(properties.map((p) => [p.id, p.address || 'No address'])), [properties])
+  const propName = useMemo(() => new Map(properties.map((p) => [p.id, propTitle(p)])), [properties])
 
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase()
     return properties
-      .filter((p) => !needle || `${p.address} ${p.client} ${p.notes} ${p.access_notes}`.toLowerCase().includes(needle))
+      .filter((p) => !needle || `${p.name ?? ''} ${p.address} ${p.client} ${p.notes} ${p.access_notes}`.toLowerCase().includes(needle))
       .map((p) => ({ p, js: byProp.get(p.id) ?? [] }))
       .sort((a, b) => (b.js[0]?.job_date ?? b.p.created_at).localeCompare(a.js[0]?.job_date ?? a.p.created_at))
   }, [properties, byProp, q])
@@ -47,7 +47,7 @@ export function Home() {
         <p className="hero-sub">{today}</p>
         <label className="searchbar">
           <ISearch size={18} />
-          <input type="search" placeholder="Search address, client, notes" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input type="search" placeholder="Search name, address, notes" value={q} onChange={(e) => setQ(e.target.value)} />
           {q && <button aria-label="Clear" onClick={() => setQ('')}><IX size={16} /></button>}
         </label>
       </section>
@@ -93,7 +93,8 @@ export function Home() {
               <button key={p.id} className="row" onClick={() => go('p/' + p.id)}>
                 <Cover photo={js[0] ? covers.get(js[0].id) : undefined} className="row-cover" />
                 <div className="grow">
-                  <div className="title">{p.address || 'No address'}</div>
+                  <div className="title">{propTitle(p)}</div>
+                  {propSubtitle(p) && <div className="sub addr-line">{propSubtitle(p)}</div>}
                   <div className="sub">
                     {js.length ? `${relDate(js[0].job_date)} · ${js.length} job${js.length > 1 ? 's' : ''}` : 'No jobs yet'}
                     {p.client && ` · ${p.client}`}

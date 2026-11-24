@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { createJob, db, deleteProperty, fmtDate, money, patchProperty, type Job, type Photo, type Property } from '../lib/db'
 import { back, go } from '../lib/nav'
 import { Header, Thumb } from './common'
-import { IKey, INav, INote, IPlus, ITrash, IUser } from './icons'
+import { IKey, INav, INote, IPin, IPlus, ITrash, IUser } from './icons'
 
 export function PropertyScreen({ id }: { id: string }) {
   const [prop, setProp] = useState<Property | null | undefined>(undefined)
@@ -32,9 +32,13 @@ export function PropertyScreen({ id }: { id: string }) {
       <Header title="" backBtn />
       <div className="pad stack">
         <div className="prop-hero">
-          <textarea className="addr-input" rows={1} defaultValue={prop.address} placeholder="Address"
-            onChange={(e) => set({ address: e.target.value })}
+          <textarea className="addr-input" rows={1} defaultValue={prop.name ?? ''} placeholder="Name this property"
+            onChange={(e) => set({ name: e.target.value })}
             onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px' }} />
+          <label className="client-input">
+            <IPin size={15} />
+            <input defaultValue={prop.address} placeholder="Address" onChange={(e) => set({ address: e.target.value })} />
+          </label>
           <label className="client-input">
             <IUser size={15} />
             <input defaultValue={prop.client} placeholder="Client or contractor" onChange={(e) => set({ client: e.target.value })} />

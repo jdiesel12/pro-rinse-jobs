@@ -293,3 +293,7 @@ textarea.soft { background: var(--fill); }
   .screen { max-width: 640px; margin: 0 auto; }
   .hero { border-radius: 0 0 28px 28px; }
 }
+
+/* name + address: address line sits right under the name */
+.sub.addr-line { color: var(--ink-2); margin-top: 1px; }
+.prop-hero .client-input + .client-input { margin-top: -2px; }

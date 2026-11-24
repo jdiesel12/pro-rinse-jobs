@@ -1,16 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
-  addPhoto, db, deleteJob, deletePhoto, fmtDate, money, patchJob, SERVICES,
-  type Job, type Photo, type PhotoKind,
+  addPhoto, db, deleteJob, deletePhoto, fmtDate, money, patchJob, propSubtitle, propTitle, SERVICES,
+  type Job, type Photo,
 } from '../lib/db'
 import { compressImage } from '../lib/image'
 import { back, go } from '../lib/nav'
 import { Header, Thumb } from './common'
 import { ICalendar, ICamera, ICheck, IChevron, IClock, IHistory, IImage, IKey, INote, IPin, ITag, ITrash, IX } from './icons'
 
-const KINDS: PhotoKind[] = ['before', 'after', 'other']
-const cap = (s: string) => s[0].toUpperCase() + s.slice(1)
 
 export function JobScreen({ id, owner }: { id: string; owner: string }) {
   const [job, setJob] = useState<Job | null | undefined>(undefined)
@@ -30,7 +28,6 @@ export function JobScreen({ id, owner }: { id: string; owner: string }) {
     return js.sort((a, b) => b.job_date.localeCompare(a.job_date))[0]
   }, [job?.property_id, job?.job_date, id])
 
-  const [kind, setKind] = useState<PhotoKind>('before')
   const [busy, setBusy] = useState(0)
   const [viewer, setViewer] = useState<Photo | null>(null)
   const camRef = useRef<HTMLInputElement>(null)
@@ -51,7 +48,7 @@ export function JobScreen({ id, owner }: { id: string; owner: string }) {
     setBusy((b) => b + files.length)
     for (const f of Array.from(files)) {
       try {
-        await addPhoto(id, kind, await compressImage(f), owner)
+        await addPhoto(id, 'other', await compressImage(f), owner)
       } catch (e) {
         alert('Could not read that photo: ' + (e instanceof Error ? e.message : e))
       } finally {
@@ -74,7 +71,6 @@ export function JobScreen({ id, owner }: { id: string; owner: string }) {
   }
 
   const hours = job.duration_min == null ? '' : String(+(job.duration_min / 60).toFixed(2))
-  const counts = Object.fromEntries(KINDS.map((k) => [k, photos.filter((p) => p.kind === k).length]))
 
   return (
     <div className="screen">
@@ -83,7 +79,8 @@ export function JobScreen({ id, owner }: { id: string; owner: string }) {
         <button className="card prop-card" onClick={() => go('p/' + job.property_id)}>
           <span className="tile blue"><IPin size={20} /></span>
           <div className="grow">
-            <div className="title">{property?.address || 'No address'}</div>
+            <div className="title">{propTitle(property)}</div>
+            {propSubtitle(property) && <div className="sub addr-line">{propSubtitle(property)}</div>}
             {prevJob
               ? <div className="sub"><IHistory size={13} className="inline-ic" /> Last visit {fmtDate(prevJob.job_date)} · {money(prevJob.price)}</div>
               : <div className="sub">First visit</div>}
@@ -132,24 +129,18 @@ export function JobScreen({ id, owner }: { id: string; owner: string }) {
         <div className="card">
           <div className="card-title">
             <ICamera size={16} /> Photos
+            {photos.length > 0 && <span className="count">{photos.length}</span>}
             {busy > 0 && <span className="saving">Saving {busy}…</span>}
           </div>
-          <div className="seg">
-            {KINDS.map((k) => (
-              <button key={k} className={kind === k ? 'on' : ''} onClick={() => setKind(k)}>
-                {cap(k)}{counts[k] > 0 && <small>{counts[k]}</small>}
-              </button>
-            ))}
-          </div>
           <div className="photo-actions">
-            <button className="action" onClick={() => camRef.current?.click()}><ICamera size={22} /><span>Take {kind} photo</span></button>
+            <button className="action" onClick={() => camRef.current?.click()}><ICamera size={22} /><span>Take photo</span></button>
             <button className="action" onClick={() => libRef.current?.click()}><IImage size={22} /><span>From library</span></button>
           </div>
           <input ref={camRef} hidden type="file" accept="image/*" capture="environment" onChange={(e) => { void onFiles(e.target.files); e.target.value = '' }} />
           <input ref={libRef} hidden type="file" accept="image/*" multiple onChange={(e) => { void onFiles(e.target.files); e.target.value = '' }} />
           {photos.length > 0 && (
             <div className="grid">
-              {photos.map((p) => <Thumb key={p.id} id={p.id} path={p.path} label={p.kind} onClick={() => setViewer(p)} />)}
+              {photos.map((p) => <Thumb key={p.id} id={p.id} path={p.path} onClick={() => setViewer(p)} />)}
             </div>
           )}
         </div>
@@ -170,14 +161,7 @@ export function JobScreen({ id, owner }: { id: string; owner: string }) {
           <button className="viewer-close" aria-label="Close" onClick={() => setViewer(null)}><IX size={22} /></button>
           <FullImage id={viewer.id} />
           <div className="viewer-bar">
-            <div className="seg dark">
-              {KINDS.map((k) => (
-                <button key={k} className={viewer.kind === k ? 'on' : ''} onClick={async () => {
-                  await db.photos.update(viewer.id, { kind: k, dirty: 1, mtime: new Date().toISOString() })
-                  setViewer({ ...viewer, kind: k })
-                }}>{cap(k)}</button>
-              ))}
-            </div>
+            <span className="grow" />
             <button className="icon-btn danger" aria-label="Delete photo" onClick={async () => { if (confirm('Delete photo?')) { await deletePhoto(viewer.id); setViewer(null) } }}>
               <ITrash size={20} />
             </button>

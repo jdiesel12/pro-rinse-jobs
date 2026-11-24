@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { createJob, createProperty } from '../lib/db'
+import { createJob, createProperty, propSubtitle, propTitle } from '../lib/db'
 import { replace } from '../lib/nav'
 import { Header, relDate, useAllData } from './common'
 import { IChevron, IHome, IPlus, ISearch } from './icons'
@@ -13,13 +13,13 @@ export function NewJob() {
     const last = new Map<string, string>()
     for (const j of jobs) if ((last.get(j.property_id) ?? '') < j.job_date) last.set(j.property_id, j.job_date)
     const matches = properties
-      .filter((p) => !needle || `${p.address} ${p.client}`.toLowerCase().includes(needle))
+      .filter((p) => !needle || `${p.name ?? ''} ${p.address} ${p.client}`.toLowerCase().includes(needle))
       .sort((a, b) => (last.get(b.id) ?? '').localeCompare(last.get(a.id) ?? ''))
       .slice(0, 30)
     return { matches, last }
   }, [properties, jobs, needle])
 
-  const exact = properties.some((p) => p.address.trim().toLowerCase() === needle)
+  const exact = properties.some((p) => p.address.trim().toLowerCase() === needle || (p.name ?? '').trim().toLowerCase() === needle)
 
   async function pick(propertyId: string) {
     const id = await createJob(propertyId)
@@ -35,11 +35,11 @@ export function NewJob() {
       <div className="pad stack">
         <div>
           <h2 className="big-q">Where’s the job?</h2>
-          <p className="muted">Pick a property or type a new address.</p>
+          <p className="muted">Search by name or address, or type a new address.</p>
         </div>
         <label className="searchbar solid">
           <ISearch size={18} />
-          <input autoFocus type="search" placeholder="Address" value={q} onChange={(e) => setQ(e.target.value)}
+          <input autoFocus type="search" placeholder="Name or address" value={q} onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && needle && !exact) void createNew() }} />
         </label>
 
@@ -51,7 +51,8 @@ export function NewJob() {
                 <button key={p.id} className="row" onClick={() => pick(p.id)}>
                   <span className="cover row-cover sm"><IHome size={18} /></span>
                   <div className="grow">
-                    <div className="title">{p.address || 'No address'}</div>
+                    <div className="title">{propTitle(p)}</div>
+                    {propSubtitle(p) && <div className="sub addr-line">{propSubtitle(p)}</div>}
                     <div className="sub">{last.get(p.id) ? `Last ${relDate(last.get(p.id)!)}` : 'No jobs yet'}{p.client && ` · ${p.client}`}</div>
                   </div>
                   <IChevron size={18} className="chev" />

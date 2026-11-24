@@ -7,6 +7,7 @@ type SyncFields = { created_at: string; updated_at?: string; deleted: boolean; d
 
 export type Property = SyncFields & {
   id: string
+  name: string // optional nickname, e.g. "Johnson house"
   address: string
   client: string
   access_notes: string
@@ -74,11 +75,16 @@ export const SERVICES = [
   'Post-construction',
 ]
 
+/** Display title: the name if set, else the address. */
+export const propTitle = (p?: { name?: string; address?: string }) => p?.name?.trim() || p?.address?.trim() || 'No address'
+/** Secondary line: the address, only when a name is shown as the title. */
+export const propSubtitle = (p?: { name?: string; address?: string }) => (p?.name?.trim() ? p.address?.trim() ?? '' : '')
+
 export async function createProperty(address: string): Promise<string> {
   const id = newId()
   const t = nowIso()
   await db.properties.add({
-    id, address: address.trim(), client: '', access_notes: '', notes: '',
+    id, name: '', address: address.trim(), client: '', access_notes: '', notes: '',
     created_at: t, deleted: false, dirty: 1, mtime: t,
   })
   return id
