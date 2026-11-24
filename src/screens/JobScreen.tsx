@@ -31,12 +31,14 @@ export function JobScreen({ id, owner }: { id: string; owner: string }) {
   const [viewer, setViewer] = useState<Photo | null>(null)
   const camRef = useRef<HTMLInputElement>(null)
   const libRef = useRef<HTMLInputElement>(null)
+  const latest = useRef<Job | null>(null) // newest edits, so rapid taps don't clobber each other
 
   if (job === undefined) return <div className="screen"><Header title="Job" backBtn /></div>
   if (job === null || job.deleted) return <div className="screen"><Header title="Job" backBtn /><div className="empty">Job not found.</div></div>
 
   const set = (changes: Partial<Job>) => {
-    setJob({ ...job, ...changes })
+    latest.current = { ...(latest.current ?? job), ...changes }
+    setJob(latest.current)
     void patchJob(id, changes)
   }
 
@@ -63,8 +65,10 @@ export function JobScreen({ id, owner }: { id: string; owner: string }) {
     back()
   }
 
-  const toggleService = (s: string) =>
-    set({ services: job.services.includes(s) ? job.services.filter((x) => x !== s) : [...job.services, s] })
+  const toggleService = (s: string) => {
+    const cur = (latest.current ?? job).services
+    set({ services: cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s] })
+  }
 
   const hours = job.duration_min == null ? '' : String(+(job.duration_min / 60).toFixed(2))
 
