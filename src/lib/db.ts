@@ -20,9 +20,42 @@ export type Job = SyncFields & {
   job_date: string // YYYY-MM-DD
   price: number | null
   services: string[]
-  duration_min: number | null
-  notes: string
+  scope: Scope
+  ext_minutes: number | null
+  int_minutes: number | null
+  ext_notes: string
+  int_notes: string
+  duration_min: number | null // total (ext + int), kept for convenience
+  notes: string // legacy single-notes field; migrated into ext/int notes
 }
+
+export type Scope = 'exterior' | 'interior' | 'both'
+export type Side = 'ext' | 'int'
+export const SCOPES: { key: Scope; label: string }[] = [
+  { key: 'exterior', label: 'Exterior' },
+  { key: 'interior', label: 'Interior' },
+  { key: 'both', label: 'Both' },
+]
+export const sidesOf = (s: Scope): Side[] => (s === 'both' ? ['ext', 'int'] : s === 'interior' ? ['int'] : ['ext'])
+export const SIDE_LABEL: Record<Side, string> = { ext: 'Exterior', int: 'Interior' }
+
+/** Fill in the interior/exterior fields for rows saved before they existed. */
+export function migrateJob<T extends Partial<Job>>(j: T): T {
+  if (j.scope) return j
+  const svc = j.services ?? []
+  const scope: Scope = svc.includes('Exterior') && svc.includes('Interior') ? 'both' : svc.includes('Interior') ? 'interior' : 'exterior'
+  const intOnly = scope === 'interior'
+  return {
+    ...j, scope,
+    services: svc.filter((s) => s !== 'Exterior' && s !== 'Interior'),
+    ext_minutes: intOnly ? null : j.duration_min ?? null,
+    int_minutes: intOnly ? j.duration_min ?? null : null,
+    ext_notes: intOnly ? '' : j.notes ?? '',
+    int_notes: intOnly ? j.notes ?? '' : '',
+  }
+}
+
+export const fmtHours = (min: number | null | undefined) => (min ? `${+(min / 60).toFixed(2)}h` : '')
 
 export type PhotoKind = 'before' | 'after' | 'other'
 
@@ -51,6 +84,8 @@ class AppDB extends Dexie {
       blobs: 'id',
       meta: 'key',
     })
+    this.version(2).stores({}).upgrade((tx) =>
+      tx.table('jobs').toCollection().modify((j: Job) => { Object.assign(j, migrateJob(j)) }))
   }
 }
 
@@ -62,18 +97,6 @@ export const today = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
-
-export const SERVICES = [
-  'Exterior',
-  'Interior',
-  'Screens',
-  'Tracks',
-  'Hard water',
-  'Skylights',
-  'Solar panels',
-  'Gutters',
-  'Post-construction',
-]
 
 /** Display title: the name if set, else the address. */
 export const propTitle = (p?: { name?: string; address?: string }) => p?.name?.trim() || p?.address?.trim() || 'No address'
@@ -93,13 +116,16 @@ export async function createProperty(address: string): Promise<string> {
 export async function createJob(property_id: string): Promise<string> {
   const id = newId()
   const t = nowIso()
-  // Pre-fill services from this property's most recent job.
+  // Default interior/exterior to whatever was done last time here.
   const prev = (await db.jobs.where('property_id').equals(property_id).toArray())
     .filter((j) => !j.deleted)
     .sort((a, b) => b.job_date.localeCompare(a.job_date))[0]
   await db.jobs.add({
     id, property_id, job_date: today(), price: null,
-    services: prev ? [...prev.services] : [], duration_min: null, notes: '',
+    services: [],
+    scope: prev ? migrateJob(prev).scope : 'exterior',
+    ext_minutes: null, int_minutes: null, ext_notes: '', int_notes: '',
+    duration_min: null, notes: '',
     created_at: t, deleted: false, dirty: 1, mtime: t,
   })
   return id

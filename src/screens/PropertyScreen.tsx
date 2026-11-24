@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { createJob, db, deleteProperty, fmtDate, money, patchProperty, type Job, type Photo, type Property } from '../lib/db'
+import { createJob, db, deleteProperty, fmtDate, fmtHours, migrateJob, money, patchProperty, SIDE_LABEL, sidesOf, type Job, type Photo, type Property } from '../lib/db'
 import { back, go } from '../lib/nav'
 import { Header, Thumb } from './common'
 import { IKey, INav, INote, IPin, IPlus, ITrash, IUser } from './icons'
@@ -72,6 +72,7 @@ export function PropertyScreen({ id }: { id: string }) {
         <div className="timeline">
           {jobs.map((j) => {
             const ps = photosByJob.get(j.id) ?? []
+            const m = migrateJob(j)
             return (
               <button key={j.id} className="tl-item" onClick={() => go('j/' + j.id)}>
                 <span className="tl-dot" />
@@ -80,13 +81,14 @@ export function PropertyScreen({ id }: { id: string }) {
                     <div className="title">{fmtDate(j.job_date)}</div>
                     <div className="tl-price">{money(j.price)}</div>
                   </div>
-                  {(j.services.length > 0 || j.duration_min) && (
-                    <div className="mini-tags">
-                      {j.services.map((s) => <span key={s}>{s}</span>)}
-                      {j.duration_min ? <span className="ghost">{+(j.duration_min / 60).toFixed(1)} hrs</span> : null}
-                    </div>
-                  )}
-                  {j.notes && <div className="sub clamp">{j.notes}</div>}
+                  <div className="mini-tags">
+                    {sidesOf(m.scope).map((sd) => (
+                      <span key={sd} className={`tag-${sd}`}>{SIDE_LABEL[sd]}{m[`${sd}_minutes`] ? ` · ${fmtHours(m[`${sd}_minutes`])}` : ''}</span>
+                    ))}
+                  </div>
+                  {sidesOf(m.scope).map((sd) => m[`${sd}_notes`] && (
+                    <div key={sd} className="sub clamp">{m.scope === 'both' && <b>{SIDE_LABEL[sd]}: </b>}{m[`${sd}_notes`]}</div>
+                  ))}
                   {ps.length > 0 && (
                     <div className="strip">
                       {ps.slice(0, 4).map((p) => <Thumb key={p.id} id={p.id} path={p.path} />)}

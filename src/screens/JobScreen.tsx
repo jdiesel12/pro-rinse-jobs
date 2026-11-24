@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
-  addPhoto, db, deleteJob, deletePhoto, fmtDate, money, patchJob, propSubtitle, propTitle, SERVICES,
-  type Job, type Photo,
+  addPhoto, db, deleteJob, deletePhoto, fmtDate, fmtHours, migrateJob, money, patchJob, propSubtitle, propTitle,
+  SCOPES, SIDE_LABEL, sidesOf, type Job, type Photo, type Side,
 } from '../lib/db'
 import { compressImage } from '../lib/image'
 import { back, go } from '../lib/nav'
 import { Header, Thumb } from './common'
-import { ICalendar, ICamera, ICheck, IChevron, IClock, IHistory, IImage, IKey, INote, IPin, ITag, ITrash, IX } from './icons'
+import { ICalendar, ICamera, IChevron, IClock, IHistory, IImage, IKey, IPin, ITrash, IX } from './icons'
 
 
 export function JobScreen({ id, owner }: { id: string; owner: string }) {
@@ -15,7 +15,7 @@ export function JobScreen({ id, owner }: { id: string; owner: string }) {
   const isNew = location.hash.endsWith('/new')
 
   // Load once; after that local state is the editor and every change autosaves.
-  useEffect(() => { db.jobs.get(id).then((j) => setJob(j ?? null)) }, [id])
+  useEffect(() => { db.jobs.get(id).then((j) => setJob(j ? migrateJob(j) : null)) }, [id])
 
   const property = useLiveQuery(() => (job ? db.properties.get(job.property_id) : undefined), [job?.property_id])
   const photos = useLiveQuery(
@@ -59,18 +59,23 @@ export function JobScreen({ id, owner }: { id: string; owner: string }) {
 
   async function done() {
     // Throw away a brand-new job you backed out of without entering anything.
-    const empty = job && job.price == null && !job.notes && photos.length === 0
+    const empty = job && job.price == null && !job.ext_notes && !job.int_notes && !job.ext_minutes && !job.int_minutes && photos.length === 0
     if (isNew && empty && !confirm('Nothing entered yet. Discard this job?')) return
     if (isNew && empty) await deleteJob(id)
     back()
   }
 
-  const toggleService = (s: string) => {
-    const cur = (latest.current ?? job).services
-    set({ services: cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s] })
-  }
 
-  const hours = job.duration_min == null ? '' : String(+(job.duration_min / 60).toFixed(2))
+  // Hours per side; the job total is kept in duration_min.
+  const setMinutes = (side: Side, min: number | null) => {
+    const cur = latest.current ?? job
+    const ext = side === 'ext' ? min : cur.ext_minutes
+    const int = side === 'int' ? min : cur.int_minutes
+    const total = (ext ?? 0) + (int ?? 0)
+    set({ [`${side}_minutes`]: min, duration_min: total || null } as Partial<Job>)
+  }
+  const sides = sidesOf(job.scope)
+  const total = sides.reduce((s, sd) => s + (job[`${sd}_minutes`] ?? 0), 0)
 
   return (
     <div className="screen">
@@ -99,32 +104,39 @@ export function JobScreen({ id, owner }: { id: string; owner: string }) {
             <input type="text" inputMode="decimal" placeholder="0" defaultValue={job.price ?? ''}
               onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); set({ price: v === '' ? null : Number(v) }) }} />
           </div>
-          <div className="split">
+          <div className="split one">
             <label className="mini-field">
               <span className="label"><ICalendar size={13} /> Date</span>
               <input type="date" value={job.job_date} onChange={(e) => e.target.value && set({ job_date: e.target.value })} />
-            </label>
-            <label className="mini-field">
-              <span className="label"><IClock size={13} /> Hours</span>
-              <input type="text" inputMode="decimal" placeholder="—" defaultValue={hours}
-                onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); set({ duration_min: v === '' ? null : Math.round(Number(v) * 60) }) }} />
             </label>
           </div>
         </div>
 
         <div className="card">
-          <div className="card-title"><ITag size={16} /> Services</div>
-          <div className="chips">
-            {SERVICES.map((s) => {
-              const on = job.services.includes(s)
-              return (
-                <button key={s} className={`chip ${on ? 'on' : ''}`} onClick={() => toggleService(s)}>
-                  {on && <ICheck size={14} strokeWidth={3} />}{s}
-                </button>
-              )
-            })}
+          <div className="seg scope-seg">
+            {SCOPES.map((s) => (
+              <button key={s.key} className={job.scope === s.key ? 'on' : ''} onClick={() => set({ scope: s.key })}>{s.label}</button>
+            ))}
           </div>
+          {sides.map((sd) => (
+            <div key={sd} className={`side side-${sd}`}>
+              {sides.length > 1 && <div className="side-head">{SIDE_LABEL[sd]}</div>}
+              <label className="side-hours">
+                <IClock size={16} />
+                <span>Hours</span>
+                <input type="text" inputMode="decimal" placeholder="—"
+                  defaultValue={job[`${sd}_minutes`] == null ? '' : String(+(job[`${sd}_minutes`]! / 60).toFixed(2))}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); setMinutes(sd, v === '' ? null : Math.round(Number(v) * 60)) }} />
+              </label>
+              <textarea className="soft" rows={3}
+                placeholder={sd === 'ext' ? 'Exterior notes: ladders, hard water, screens…' : 'Interior notes: rooms, furniture, sills…'}
+                defaultValue={job[`${sd}_notes`]}
+                onChange={(e) => set({ [`${sd}_notes`]: e.target.value } as Partial<Job>)} />
+            </div>
+          ))}
+          {sides.length > 1 && total > 0 && <div className="side-total"><span>Total time</span><b>{fmtHours(total)}</b></div>}
         </div>
+
 
         <div className="card">
           <div className="card-title">
@@ -143,12 +155,6 @@ export function JobScreen({ id, owner }: { id: string; owner: string }) {
               {photos.map((p) => <Thumb key={p.id} id={p.id} path={p.path} onClick={() => setViewer(p)} />)}
             </div>
           )}
-        </div>
-
-        <div className="card">
-          <div className="card-title"><INote size={16} /> Notes</div>
-          <textarea className="soft" rows={4} placeholder="Problem windows, extras, anything worth remembering…" defaultValue={job.notes}
-            onChange={(e) => set({ notes: e.target.value })} />
         </div>
 
         <button className="text-danger" onClick={async () => { if (confirm('Delete this job and its photos?')) { await deleteJob(id); back() } }}>
